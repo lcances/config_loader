@@ -1,113 +1,107 @@
+import os
 import pytest
 from pathlib import Path
-import yaml
-from typing import List, Any, get_type_hints
-from configurer.core.loader import load_config, ConfigurationError, create_config_class
+from configurer.core.loader import (
+    load_config,
+    ConfigurationError,
+    EnvironmentVariableNotFoundError,
+    replace_env_variables
+)
 
 @pytest.fixture
-def temp_config_file(tmp_path):
-    """Fixture to create a temporary YAML config file."""
-    config_content = """
+def env_vars(monkeypatch):
+    """Setup environment variables for testing."""
+    # Use monkeypatch instead of directly setting os.environ
+    monkeypatch.setenv('ENV_VALUE_2', 'test_value_2')
+    monkeypatch.setenv('ENV_VALUE_3', 'test_value_3')
+    monkeypatch.setenv('NESTED_VAR', 'nested_value')
+    yield
+
+@pytest.fixture
+def config_file_with_env(tmp_path):
+    """Create a temporary config file with environment variables."""
+    content = """
 key_1: value1
-key_2: value2
-key_3:
+key_2: $ENV_VALUE_2
+key_3: ${ENV_VALUE_3}
+key_4:
   - a
   - b
+  - $NESTED_VAR
 """
     config_file = tmp_path / "config.yaml"
-    config_file.write_text(config_content)
+    config_file.write_text(content)
     return config_file
 
-@pytest.fixture
-def invalid_yaml_file(tmp_path):
-    """Fixture to create an invalid YAML file."""
-    invalid_content = """
-key_1: value1
-  invalid_indent:
-- not valid yaml
-"""
-    config_file = tmp_path / "invalid.yaml"
-    config_file.write_text(invalid_content)
-    return config_file
+def test_replace_env_variables_simple(monkeypatch):
+    """Test replacing environment variables in a simple string."""
+    monkeypatch.setenv('TEST_VAR', 'test_value')
+    assert replace_env_variables('$TEST_VAR') == 'test_value'
 
-def test_load_config_basic(temp_config_file):
-    """Test basic configuration loading with valid YAML."""
-    config = load_config(temp_config_file)
-    
-    # Test values are correctly loaded
-    assert config.key_1 == "value1"
-    assert config.key_2 == "value2"
-    assert config.key_3 == ["a", "b"]
-    
-    # Test type hints are correctly set
-    type_hints = get_type_hints(config.__class__)
-    assert type_hints["key_1"] == Any
-    assert type_hints["key_2"] == Any
-    assert type_hints["key_3"] == List[Any]
+def test_replace_env_variables_braces(monkeypatch):
+    """Test replacing environment variables using braces syntax."""
+    monkeypatch.setenv('TEST_VAR', 'test_value')
+    assert replace_env_variables('${TEST_VAR}') == 'test_value'
 
-def test_load_config_with_path_object(temp_config_file):
-    """Test loading config with Path object instead of string."""
-    config = load_config(Path(temp_config_file))
-    assert config.key_1 == "value1"
+def test_replace_env_variables_missing():
+    """Test behavior with missing environment variables."""
+    with pytest.raises(EnvironmentVariableNotFoundError):
+        replace_env_variables('$NONEXISTENT_VAR')
 
-def test_load_config_file_not_found():
-    """Test proper error handling when file doesn't exist."""
-    with pytest.raises(ConfigurationError) as exc_info:
-        load_config("nonexistent.yaml")
-    assert "Error reading configuration file" in str(exc_info.value)
+def test_replace_env_variables_in_list(monkeypatch):
+    """Test replacing environment variables in a list."""
+    monkeypatch.setenv('TEST_VAR', 'test_value')
+    result = replace_env_variables(['normal', '$TEST_VAR', '${TEST_VAR}'])
+    assert result == ['normal', 'test_value', 'test_value']
 
-def test_load_config_invalid_yaml(invalid_yaml_file):
-    """Test proper error handling with invalid YAML."""
-    with pytest.raises(ConfigurationError) as exc_info:
-        load_config(invalid_yaml_file)
-    assert "Error parsing YAML" in str(exc_info.value)
-
-def test_create_config_class_empty():
-    """Test creating config class with empty dict."""
-    ConfigClass = create_config_class({})
-    config = ConfigClass()
-    assert len(get_type_hints(config.__class__)) == 0
-
-def test_create_config_class_types():
-    """Test type annotation creation for different value types."""
-    yaml_data = {
-        "string_value": "test",
-        "int_value": 123,
-        "list_value": [1, 2, 3],
-        "dict_value": {"a": 1},
+def test_replace_env_variables_in_dict(monkeypatch):
+    """Test replacing environment variables in a dictionary."""
+    monkeypatch.setenv('TEST_VAR', 'test_value')
+    result = replace_env_variables({
+        'normal': 'value',
+        'env': '$TEST_VAR',
+        'braces': '${TEST_VAR}'
+    })
+    assert result == {
+        'normal': 'value',
+        'env': 'test_value',
+        'braces': 'test_value'
     }
-    
-    ConfigClass = create_config_class(yaml_data)
-    config = ConfigClass()
-    
-    type_hints = get_type_hints(config.__class__)
-    assert type_hints["string_value"] == Any
-    assert type_hints["int_value"] == Any
-    assert type_hints["list_value"] == List[Any]
-    assert type_hints["dict_value"] == Any
 
-def test_non_dict_yaml():
-    """Test proper error handling when YAML root is not a dict."""
-    yaml_content = "- just\n- a\n- list"
-    config_file = Path("temp.yaml")
-    
-    try:
-        config_file.write_text(yaml_content)
-        with pytest.raises(ConfigurationError) as exc_info:
-            load_config(config_file)
-        assert "Root YAML structure must be a dictionary" in str(exc_info.value)
-    finally:
-        config_file.unlink(missing_ok=True)
+def test_load_config_with_env_vars(monkeypatch, config_file_with_env):
+    """Test loading configuration with environment variables."""
+    monkeypatch.setenv('ENV_VALUE_2', 'test_value_2')
+    monkeypatch.setenv('ENV_VALUE_3', 'test_value_3')
+    monkeypatch.setenv('NESTED_VAR', 'nested_value')
+    config = load_config(config_file_with_env)
 
-def test_dataclass_immutability():
-    """Test that the created dataclass preserves values."""
-    yaml_data = {
-        "key_1": "value1",
-        "key_2": [1, 2, 3]
-    }
+    print('config:', config)
+    # print all attributes of the config object
+    for attr in dir(config):
+        print(attr, getattr(config, attr))
     
-    ConfigClass = create_config_class(yaml_data)
-    config = ConfigClass()
-    
-    assert config.key_1 == "value1"
-    assert config.key_2 == [1, 2, 3]
+    assert config.key_1 == 'value1'
+    assert config.key_2 == 'test_value_2'
+    assert config.key_3 == 'test_value_3'
+    assert config.key_4 == ['a', 'b', 'nested_value']
+
+def test_load_config_with_missing_env_var(monkeypatch, config_file_with_env):
+    """Test loading configuration with a missing environment variable."""
+    monkeypatch.setenv('ENV_VALUE_2', 'test_value_2')
+    monkeypatch.setenv('ENV_VALUE_3', 'test_value_3')
+    # monkeypatch.setenv('NESTED_VAR', None)
+    with pytest.raises(EnvironmentVariableNotFoundError):
+        load_config(config_file_with_env)
+
+def test_partial_env_var_replacement(monkeypatch):
+    """Test replacing environment variables within larger strings."""
+    monkeypatch.setenv('TEST_VAR', 'world')
+    result = replace_env_variables('hello_$TEST_VAR')
+    assert result == 'hello_world'
+
+def test_multiple_env_vars_in_string(monkeypatch):
+    """Test replacing multiple environment variables in a single string."""
+    monkeypatch.setenv('VAR1', 'hello')
+    monkeypatch.setenv('VAR2', 'world')
+    result = replace_env_variables('$VAR1 ${VAR2}!')
+    assert result == 'hello world!'

@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "configurer"
 dynamic = ["version"]
 authors = [
-    { name = "Your Name", email = "your.email@example.com" }
+    { name = "Leo Cances", email = "leocances@gmail.com" }
 ]
 description = "A dynamic configuration loader for Python applications"
 readme = "README.md"
@@ -38,4 +38,4 @@ Repository = "https://github.com/lcances/config_loader.git"
 "Bug Tracker" = "https://github.com/lcances/config_loader/issues"
 
 [tool.hatch.version]
-path = "src/config_loader/__init__.py"
+path = "src/configurer/__init__.py"

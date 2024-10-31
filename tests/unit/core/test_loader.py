@@ -2,7 +2,7 @@ import pytest
 from pathlib import Path
 import yaml
 from typing import List, Any, get_type_hints
-from config_loader.core.loader import load_config, ConfigurationError, create_config_class
+from configurer.core.loader import load_config, ConfigurationError, create_config_class
 
 @pytest.fixture
 def temp_config_file(tmp_path):

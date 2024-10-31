@@ -66,9 +66,6 @@ jobs:
       - name: Publish to PyPI
         if: steps.check_version.outputs.exists == 'false'
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
           
       - name: Create GitHub Release
         if: steps.check_version.outputs.exists == 'false'

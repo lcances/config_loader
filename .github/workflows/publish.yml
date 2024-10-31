@@ -40,7 +40,7 @@ jobs:
         id: version
         run: |
           # Extract version from __init__.py using Python
-          VERSION=$(python -c "exec(open('src/config_loader/__init__.py').read()); print(__version__)")
+          VERSION=$(python -c "exec(open('src/configurer/__init__.py').read()); print(__version__)")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Check if version exists

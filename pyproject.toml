@@ -11,3 +11,11 @@ authors = [
 description = "A short description of your project"
 readme = "README.md"
 requires-python = ">=3.8"
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+]

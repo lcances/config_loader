@@ -9,7 +9,7 @@ Brief description of your project.
 ## Installation
 
 ```bash
-pip install config_loader
+pip install configurer
 ```
 
 ## Usage
